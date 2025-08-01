@@ -1,0 +1,125 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest]
+        target: [x86_64-pc-windows-msvc]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: ${{ matrix.target }}
+        override: true
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    - name: Build release
+      run: cargo build --release --target ${{ matrix.target }}
+
+    - name: Create release directory
+      run: mkdir -p release
+
+    - name: Copy executable
+      run: |
+        if [ "${{ runner.os }}" = "Windows" ]; then
+          copy "target\${{ matrix.target }}\release\esubpoena-tolls-tool.exe" "release\"
+        else
+          cp "target/${{ matrix.target }}/release/esubpoena-tolls-tool" "release/"
+        fi
+
+    - name: Copy documentation
+      run: |
+        copy "README_RUST.md" "release\"
+        copy "RUST_SETUP_GUIDE.md" "release\"
+        copy "CONVERSION_SUMMARY.md" "release\"
+
+    - name: Create installer script
+      run: |
+        echo @echo off > "release\install.bat"
+        echo echo Installing eSubpoena Tolls Tool... >> "release\install.bat"
+        echo echo. >> "release\install.bat"
+        echo echo This will install the application to your desktop. >> "release\install.bat"
+        echo echo. >> "release\install.bat"
+        echo copy "esubpoena-tolls-tool.exe" "%USERPROFILE%\Desktop\" >> "release\install.bat"
+        echo echo. >> "release\install.bat"
+        echo echo Installation complete! >> "release\install.bat"
+        echo echo You can now run the application from your desktop. >> "release\install.bat"
+        echo pause >> "release\install.bat"
+
+    - name: Upload release artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: esubpoena-tolls-tool-${{ runner.os }}
+        path: release/
+
+  create-release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: artifacts
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          artifacts/esubpoena-tolls-tool-windows-latest/*
+        body: |
+          # eSubpoena Tolls Tool v${{ github.ref_name }}
+          
+          ## What's New
+          - High-performance Rust implementation
+          - Fast XML parsing and analytics
+          - Professional Excel export
+          - Modern GUI interface
+          
+          ## Installation
+          1. Download the appropriate file for your system
+          2. Run `install.bat` to install to your desktop
+          3. Or run the executable directly
+          
+          ## Features
+          - Parse telecommunication XML data
+          - Generate comprehensive analytics
+          - Export to Excel with multiple worksheets
+          - Multi-file support
+          - Target number analysis
+          - Common contacts detection
+          
+          ## System Requirements
+          - Windows 10/11
+          - No additional dependencies required
+          
+          ## Documentation
+          See README_RUST.md for detailed usage instructions.
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

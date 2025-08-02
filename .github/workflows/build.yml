@@ -70,7 +70,7 @@ jobs:
         echo pause >> "release\install.bat"
 
     - name: Upload release artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: esubpoena-tolls-tool-${{ runner.os }}
         path: release/
@@ -82,7 +82,7 @@ jobs:
     
     steps:
     - name: Download all artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         path: artifacts
 
